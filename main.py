@@ -6,6 +6,10 @@ from google import genai
 from google.genai import types
 import argparse
 
+from functions.call_function import available_functions
+from prompts import system_prompt
+
+
 def main():
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -22,14 +26,27 @@ def main():
     args = parser.parse_args()
     messages = [types.Content(role="user", parts=[types.Part(text=args.user_prompt)])]
 
-    content = client.models.generate_content(model="gemini-2.5-flash", contents=messages)
+    content = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=messages,
+        config=types.GenerateContentConfig(
+            tools=[available_functions], system_instruction=system_prompt
+        )
+    )
     if not content.usage_metadata:
         raise RuntimeError("failed to get a response")
     if args.verbose:
         print(f"User prompt: {args.user_prompt}")
         print(f"Prompt tokens: {content.usage_metadata.prompt_token_count}")
         print(f"Response tokens: {content.usage_metadata.candidates_token_count}")
-    print(f"Response:\n{content.text}")
+
+    if not content.function_calls:
+        print("Response:")
+        print(content.text)
+        return
+
+    for function_call in content.function_calls:
+        print(f"Calling function: {function_call.name}({function_call.args})")
 
 if __name__ == "__main__":
     main()
