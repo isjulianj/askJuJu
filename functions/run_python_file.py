@@ -20,11 +20,12 @@ def run_python_file(working_directory, file_path, args=None):
             return f'Error: "{file_path}" does not exist or is not a regular file'
 
 
+        print("target-file", target_file)
         command = ["python3", target_file]
         if args:
             command.append(*args)
 
-        ran_process = subprocess.run(command, capture_output=True, text=True, timeout=30, cwd=target_file)
+        ran_process = subprocess.run(command, capture_output=True, text=True, timeout=30, cwd=abs_file_path)
 
 
         output = ""

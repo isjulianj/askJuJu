@@ -6,7 +6,7 @@ from google import genai
 from google.genai import types
 import argparse
 
-from functions.call_function import available_functions
+from functions.call_function import available_functions, call_function
 from prompts import system_prompt
 
 
@@ -31,10 +31,10 @@ def main():
 
     generate_content(client, messages, args.verbose)
 
-def generate_content(client, messages, verbose):
+def generate_content(client, messages_list, verbose):
     response = client.models.generate_content(
         model="gemini-2.5-flash",
-        contents=messages,
+        contents=messages_list,
         config=types.GenerateContentConfig(
             tools=[available_functions], system_instruction=system_prompt
         ),
@@ -52,6 +52,17 @@ def generate_content(client, messages, verbose):
         return
 
     for function_call in response.function_calls:
+        function_call_result = call_function(function_call, verbose=verbose)
+        function_results = []
+        if len(function_call_result.parts) > 0:
+            if not isinstance(function_call_result.parts[0], genai.types.Part):
+                raise Exception("This is not a function response type")
+            if not function_call_result.parts[0].function_response.response:
+                raise Exception("No function response")
+            function_results.append(function_call_result.parts[0])
+        if verbose:
+            print(f"-> {function_call_result.parts[0].function_response.response}")
+
         print(f"Calling function: {function_call.name}({function_call.args})")
 
 
