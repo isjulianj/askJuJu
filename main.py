@@ -9,6 +9,7 @@ import argparse
 from functions.call_function import available_functions, call_function
 from prompts import system_prompt
 
+MAX_ITERATIONS = 20
 
 def main():
     load_dotenv()
@@ -29,7 +30,13 @@ def main():
     if args.verbose:
         print(f"User prompt: {args.user_prompt}")
 
-    generate_content(client, messages, args.verbose)
+    for i in range(20):
+        if i > MAX_ITERATIONS:
+            exit(1)
+        is_finished = generate_content(client, messages, args.verbose)
+        if is_finished:
+            break
+
 
 def generate_content(client, messages_list, verbose):
     response = client.models.generate_content(
@@ -39,6 +46,10 @@ def generate_content(client, messages_list, verbose):
             tools=[available_functions], system_instruction=system_prompt
         ),
     )
+    if len(response.candidates) > 0:
+        for c in response.candidates:
+            messages_list.append(c.content)
+
     if not response.usage_metadata:
         raise RuntimeError("Gemini API response appears to be malformed")
 
@@ -49,7 +60,7 @@ def generate_content(client, messages_list, verbose):
     if not response.function_calls:
         print("Response:")
         print(response.text)
-        return
+        return True
 
     for function_call in response.function_calls:
         function_call_result = call_function(function_call, verbose=verbose)
@@ -60,11 +71,12 @@ def generate_content(client, messages_list, verbose):
             if not function_call_result.parts[0].function_response.response:
                 raise Exception("No function response")
             function_results.append(function_call_result.parts[0])
+            messages_list.append(types.Content(role="user", parts=function_results))
         if verbose:
             print(f"-> {function_call_result.parts[0].function_response.response}")
 
         print(f"Calling function: {function_call.name}({function_call.args})")
-
+        return False
 
 if __name__ == "__main__":
     main()
